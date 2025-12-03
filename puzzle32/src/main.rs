@@ -13,64 +13,38 @@ fn numb_from_vec(input: &[u8]) -> u64 {
     num
 }
 
-fn compute_number(input: &[u8], indices: &[usize]) -> u64 {
-    let mut final_numb_vec = vec![];
-    for i in indices.iter() {
-        final_numb_vec.push(input[*i as usize]);
-    }
-
-    numb_from_vec(&final_numb_vec)
-}
-
-fn generate_increasing(
-    length: usize,
-    max_val: usize,
-    current: &mut Vec<usize>,
-    results: &mut Vec<Vec<usize>>,
-) {
-    if current.len() == length {
-        results.push(current.clone());
-        return;
-    }
-    let min_next = current.last().map(|&v| v + 1).unwrap_or(0);
-    for val in min_next..=max_val {
-        current.push(val);
-        generate_increasing(length, max_val, current, results);
-        current.pop();
-    }
-}
-
 fn find_max_num(input: Vec<u8>) -> u64 {
     assert!(
         input.len() >= MAX_LEN.into(),
         "input must be at least {MAX_LEN} elements long"
     );
 
-    let mut current_idxs: Vec<usize> = (0..MAX_LEN as usize).collect();
-    let mut all_idx_combos: Vec<Vec<usize>> = vec![];
+    let mut digits = Vec::new();
+    let mut start_idx = 0;
 
-    let mut max_val = 0;
+    for pos in 0..MAX_LEN as usize {
+        let search_end = input.len() - (MAX_LEN as usize - pos);
 
-    generate_increasing(
-        MAX_LEN as usize,
-        input.len() - 1,
-        &mut current_idxs,
-        &mut all_idx_combos,
-    );
+        let mut max_digit = 0;
+        let mut max_idx = start_idx;
 
-    for combo in all_idx_combos {
-        let number = compute_number(&input, combo.as_slice());
-        if number > max_val {
-            max_val = number;
+        for idx in start_idx..=search_end {
+            if input[idx] > max_digit {
+                max_digit = input[idx];
+                max_idx = idx;
+            }
         }
+
+        digits.push(max_digit);
+        start_idx = max_idx + 1;
     }
 
-    return max_val.into();
+    numb_from_vec(&digits)
 }
 
 fn main() {
     let stdin = io::stdin();
-    let mut sum: u32 = 0;
+    let mut sum: u64 = 0;
 
     for line in stdin.lock().lines() {
         let line = line.expect("Failed to read line");
@@ -79,7 +53,7 @@ fn main() {
             .filter_map(|c| c.to_digit(10).map(|d| d as u8))
             .collect();
 
-        sum = sum + (find_max_num(digits) as u32);
+        sum = sum + find_max_num(digits);
     }
 
     println!("{:?}", sum);
@@ -87,7 +61,7 @@ fn main() {
 
 #[cfg(test)]
 mod test {
-    use crate::{compute_number, find_max_num, numb_from_vec};
+    use crate::{find_max_num, numb_from_vec};
 
     #[test]
     fn numb_compute_1() {
@@ -99,27 +73,6 @@ mod test {
     fn numb_compute_2() {
         let numbs = vec![0, 2, 3];
         assert_eq!(numb_from_vec(&numbs), 23);
-    }
-
-    #[test]
-    fn computer_number_1() {
-        let numbs = vec![0, 2, 3];
-        let indices = vec![1, 2];
-        assert_eq!(compute_number(&numbs, &indices), 23);
-    }
-
-    #[test]
-    fn computer_number_2() {
-        let numbs = vec![0, 2, 3];
-        let indices = vec![0, 2];
-        assert_eq!(compute_number(&numbs, &indices), 3);
-    }
-
-    #[test]
-    fn computer_number_3() {
-        let numbs = vec![1, 2, 3, 4, 5, 6, 7];
-        let indices = vec![1, 2, 4];
-        assert_eq!(compute_number(&numbs, &indices), 235);
     }
 
     #[test]
