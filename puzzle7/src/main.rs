@@ -45,7 +45,7 @@ impl From<&str> for BlockPlan {
 }
 
 impl BlockPlan {
-    fn get_item_at(&self, (row, col): (i32, i32)) -> Option<Block> {
+    fn get_item_at(&self, (row, col): (i16, i16)) -> Option<Block> {
         if row < 0 || col < 0 {
             return None;
         } else if row as usize >= self.width || col as usize >= self.height {
@@ -62,11 +62,11 @@ impl BlockPlan {
 
     fn get_bottom_neighbours(
         &self,
-        (row, col): (i32, i32),
+        (row, col): (i16, i16),
     ) -> (
-        Option<(Block, (i32, i32))>,
-        Option<(Block, (i32, i32))>,
-        Option<(Block, (i32, i32))>,
+        Option<(Block, (i16, i16))>,
+        Option<(Block, (i16, i16))>,
+        Option<(Block, (i16, i16))>,
     ) {
         let coords = ((row + 1, col - 1), (row + 1, col), (row + 1, col + 1));
         (
@@ -76,19 +76,19 @@ impl BlockPlan {
         )
     }
 
-    fn get_bottom_neighbour(&self, (row, col): (i32, i32)) -> Option<(Block, (i32, i32))> {
+    fn get_bottom_neighbour(&self, (row, col): (i16, i16)) -> Option<(Block, (i16, i16))> {
         let coord = (row + 1, col);
         self.get_item_at(coord).map(|c| (c, coord))
     }
 }
 
 struct Traversal {
-    traversal_q: VecDeque<(i32, i32)>,
-    visited: HashSet<(i32, i32)>,
+    traversal_q: VecDeque<(i16, i16)>,
+    visited: HashSet<(i16, i16)>,
 }
 
 impl Traversal {
-    fn new(starting_position: (i32, i32)) -> Self {
+    fn new(starting_position: (i16, i16)) -> Self {
         let mut q = VecDeque::new();
         q.push_back(starting_position);
         let mut v = HashSet::new();
@@ -99,45 +99,46 @@ impl Traversal {
         }
     }
 
-    fn traverse_multiverse(mut self, block_plan: &BlockPlan) -> u32 {
-        let mut line_count = 1;
-        while self.traversal_q.len() != 0 {
-            let coord = self
-                .traversal_q
-                .pop_front()
-                .expect("Something must have gone horribly wrong Doctorr!");
+    fn traverse_multiverse(self, block_plan: &BlockPlan) -> u32 {
+        use std::collections::HashMap;
+
+        fn count_lines(
+            coord: (i16, i16),
+            block_plan: &BlockPlan,
+            memo: &mut HashMap<(i16, i16), u32>,
+        ) -> u32 {
+            if let Some(&cached) = memo.get(&coord) {
+                return cached;
+            }
+
             let bottom_neighbours = block_plan.get_bottom_neighbours(coord);
 
-            match bottom_neighbours {
+            let result = match bottom_neighbours {
                 (Some((Block::Blank, l_coord)), Some((Block::Prism, _)), None) => {
-                    self.traversal_q.push_back(l_coord);
+                    count_lines(l_coord, block_plan, memo)
                 }
                 (None, Some((Block::Prism, _)), Some((Block::Blank, r_coord))) => {
-                    self.traversal_q.push_back(r_coord);
+                    count_lines(r_coord, block_plan, memo)
                 }
                 (
                     Some((Block::Blank, l_coord)),
                     Some((Block::Prism, _)),
                     Some((Block::Blank, r_coord)),
                 ) => {
-                    line_count += 1;
-                    self.traversal_q.push_back(l_coord);
-                    self.traversal_q.push_back(r_coord);
+                    let left_lines = count_lines(l_coord, block_plan, memo);
+                    let right_lines = count_lines(r_coord, block_plan, memo);
+                    left_lines + right_lines
                 }
                 (
                     Some((Block::Blank, l_coord)),
                     Some((Block::Prism, _)),
                     Some((Block::Prism, _)),
-                ) => {
-                    self.traversal_q.push_back(l_coord);
-                }
+                ) => count_lines(l_coord, block_plan, memo),
                 (
                     Some((Block::Prism, _)),
                     Some((Block::Prism, _)),
                     Some((Block::Blank, r_coord)),
-                ) => {
-                    self.traversal_q.push_back(r_coord);
-                }
+                ) => count_lines(r_coord, block_plan, memo),
                 (_, Some((Block::Blank, m_coord)), _) => {
                     let mut coord = m_coord;
                     while let Some((Block::Blank, new_coord)) =
@@ -145,13 +146,19 @@ impl Traversal {
                     {
                         coord = new_coord;
                     }
-                    self.traversal_q.push_back(coord);
+                    count_lines(coord, block_plan, memo)
                 }
-                (_, _, _) => continue,
-            }
+                (_, None, _) => 1,
+                (_, _, _) => 0,
+            };
+
+            memo.insert(coord, result);
+            result
         }
 
-        line_count
+        let mut memo = HashMap::new();
+        let start = self.traversal_q[0];
+        count_lines(start, block_plan, &mut memo)
     }
 
     fn traverse(mut self, block_plan: &BlockPlan) -> u32 {
@@ -191,7 +198,7 @@ impl Traversal {
         split_count
     }
 
-    fn next_step(&mut self, coord: (i32, i32)) {
+    fn next_step(&mut self, coord: (i16, i16)) {
         if !self.visited.contains(&coord) {
             self.visited.insert(coord);
             self.traversal_q.push_back(coord);
@@ -210,7 +217,7 @@ fn split_and_line_count(s: &str) -> (u32, u32) {
         .find("S")
         .expect("should be at least an S monseuir");
 
-    let start_position = (0, start_column as i32); // Should be fine
+    let start_position = (0, start_column as i16); // Should be fine
     let block_plan: BlockPlan = rest_lines.into();
 
     let traversal = Traversal::new(start_position);
@@ -301,5 +308,21 @@ mod test {
         let line_count = split_and_line_count(test_input).1;
 
         assert_eq!(line_count, 40);
+    }
+
+    #[test]
+    fn lines_count_2() {
+        let test_input = vec!["..S..", "..^..", "....."].join("\n");
+        let line_count = split_and_line_count(&test_input).1;
+
+        assert_eq!(line_count, 2);
+    }
+
+    #[test]
+    fn lines_count_3() {
+        let test_input = vec!["..S..", "..^..", ".^.^.", "....."].join("\n");
+        let line_count = split_and_line_count(&test_input).1;
+
+        assert_eq!(line_count, 3);
     }
 }
