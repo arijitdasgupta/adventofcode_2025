@@ -91,8 +91,9 @@ impl Traversal {
         }
     }
 
-    fn traverse(&mut self, block_plan: &BlockPlan) -> u32 {
+    fn traverse(&mut self, block_plan: &BlockPlan) -> (u32, u32) {
         let mut split_count = 0;
+        let mut line_count = 0;
         while self.traversal_q.len() != 0 {
             let coord = self
                 .traversal_q
@@ -125,7 +126,7 @@ impl Traversal {
             }
         }
 
-        split_count
+        (split_count, line_count)
     }
 
     fn next_step(&mut self, coord: (i32, i32)) {
@@ -136,7 +137,7 @@ impl Traversal {
     }
 }
 
-fn split_count(s: &str) -> u32 {
+fn split_and_line_count(s: &str) -> (u32, u32) {
     let first_line_idx = s
         .find("\n")
         .expect("the input should have at least more than one line");
@@ -151,42 +152,21 @@ fn split_count(s: &str) -> u32 {
     let block_plan: BlockPlan = rest_lines.into();
 
     let mut traversal = Traversal::new(start_position);
-    let count = traversal.traverse(&block_plan);
-
-    count
-}
-
-fn line_count(s: &str) -> u32 {
-    let first_line_idx = s
-        .find("\n")
-        .expect("the input should have at least more than one line");
-    let first_line = &s[0..=first_line_idx];
-    let rest_lines = &s[first_line_idx + 1..];
-
-    let start_column = first_line
-        .find("S")
-        .expect("should be at least an S monseuir");
-
-    let start_position = (0, start_column as i32); // Should be fine
-    let block_plan: BlockPlan = rest_lines.into();
-
-    let mut traversal = Traversal::new(start_position);
-    let count = traversal.traverse(&block_plan);
-
-    count
+    traversal.traverse(&block_plan)
 }
 
 fn main() {
     let mut in_buf: String = Default::default();
     let _ = stdin().lock().read_to_string(&mut in_buf);
 
-    let count = split_count(&in_buf);
-    println!("Count: {count}");
+    let (split_count, line_count) = split_and_line_count(&in_buf);
+    println!("Split count: {split_count}");
+    println!("Line count: {line_count}");
 }
 
 #[cfg(test)]
 mod test {
-    use crate::{Block, BlockPlan, Traversal, line_count, split_count};
+    use crate::{Block, BlockPlan, split_and_line_count};
 
     #[test]
     fn parse_text_1() {
@@ -242,7 +222,7 @@ mod test {
     #[test]
     fn split_count_1() {
         let test_input = include_str!("../test_input_complete_1.txt");
-        let split_count = split_count(test_input);
+        let split_count = split_and_line_count(test_input).0;
 
         assert_eq!(split_count, 21);
     }
@@ -250,8 +230,8 @@ mod test {
     #[test]
     fn lines_count_1() {
         let test_input = include_str!("../test_input_complete_1.txt");
-        let split_count = line_count(test_input);
+        let line_count = split_and_line_count(test_input).1;
 
-        assert_eq!(split_count, 40);
+        assert_eq!(line_count, 40);
     }
 }
