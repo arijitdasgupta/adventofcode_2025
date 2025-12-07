@@ -52,7 +52,10 @@ impl BlockPlan {
             return None;
         }
 
-        let idx = (row as usize) * self.width + (col as usize);
+        let row: usize = row.try_into().expect("problem monsueir!");
+        let col: usize = col.try_into().expect("problem monseuir col!");
+
+        let idx = (row * self.width) + col;
 
         Some(self.items[idx])
     }
@@ -71,6 +74,11 @@ impl BlockPlan {
             self.get_item_at(coords.1).map(|r| (r, coords.1)),
             self.get_item_at(coords.2).map(|r| (r, coords.2)),
         )
+    }
+
+    fn get_bottom_neighbour(&self, (row, col): (i32, i32)) -> Option<(Block, (i32, i32))> {
+        let coord = (row + 1, col);
+        self.get_item_at(coord).map(|c| (c, coord))
     }
 }
 
@@ -91,9 +99,63 @@ impl Traversal {
         }
     }
 
-    fn traverse(&mut self, block_plan: &BlockPlan) -> (u32, u32) {
+    fn traverse_multiverse(mut self, block_plan: &BlockPlan) -> u32 {
+        let mut line_count = 1;
+        while self.traversal_q.len() != 0 {
+            let coord = self
+                .traversal_q
+                .pop_front()
+                .expect("Something must have gone horribly wrong Doctorr!");
+            let bottom_neighbours = block_plan.get_bottom_neighbours(coord);
+
+            match bottom_neighbours {
+                (Some((Block::Blank, l_coord)), Some((Block::Prism, _)), None) => {
+                    self.traversal_q.push_back(l_coord);
+                }
+                (None, Some((Block::Prism, _)), Some((Block::Blank, r_coord))) => {
+                    self.traversal_q.push_back(r_coord);
+                }
+                (
+                    Some((Block::Blank, l_coord)),
+                    Some((Block::Prism, _)),
+                    Some((Block::Blank, r_coord)),
+                ) => {
+                    line_count += 1;
+                    self.traversal_q.push_back(l_coord);
+                    self.traversal_q.push_back(r_coord);
+                }
+                (
+                    Some((Block::Blank, l_coord)),
+                    Some((Block::Prism, _)),
+                    Some((Block::Prism, _)),
+                ) => {
+                    self.traversal_q.push_back(l_coord);
+                }
+                (
+                    Some((Block::Prism, _)),
+                    Some((Block::Prism, _)),
+                    Some((Block::Blank, r_coord)),
+                ) => {
+                    self.traversal_q.push_back(r_coord);
+                }
+                (_, Some((Block::Blank, m_coord)), _) => {
+                    let mut coord = m_coord;
+                    while let Some((Block::Blank, new_coord)) =
+                        block_plan.get_bottom_neighbour(coord)
+                    {
+                        coord = new_coord;
+                    }
+                    self.traversal_q.push_back(coord);
+                }
+                (_, _, _) => continue,
+            }
+        }
+
+        line_count
+    }
+
+    fn traverse(mut self, block_plan: &BlockPlan) -> u32 {
         let mut split_count = 0;
-        let mut line_count = 0;
         while self.traversal_q.len() != 0 {
             let coord = self
                 .traversal_q
@@ -126,7 +188,7 @@ impl Traversal {
             }
         }
 
-        (split_count, line_count)
+        split_count
     }
 
     fn next_step(&mut self, coord: (i32, i32)) {
@@ -151,8 +213,14 @@ fn split_and_line_count(s: &str) -> (u32, u32) {
     let start_position = (0, start_column as i32); // Should be fine
     let block_plan: BlockPlan = rest_lines.into();
 
-    let mut traversal = Traversal::new(start_position);
-    traversal.traverse(&block_plan)
+    let traversal = Traversal::new(start_position);
+    let split_count = traversal.traverse(&block_plan);
+
+    println!("split count {}", split_count);
+    let traversal = Traversal::new(start_position);
+    let line_count = traversal.traverse_multiverse(&block_plan);
+
+    (split_count, line_count)
 }
 
 fn main() {
